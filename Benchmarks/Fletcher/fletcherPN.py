@@ -7,9 +7,9 @@ Reflection (-du/dn =0) on x=0 and y=0.
 Vacuum or fixed flux on x=1. and y=1.
 """
 import sys
-sys.path.append('../../Spatial')
-sys.path.append('../../Angular')
-sys.path.append('../../Utils')
+sys.path.append('../../')
+sys.path.append('../../')
+sys.path.append('../../')
 from dolfin import *
 import numpy as np
 
