@@ -25,6 +25,7 @@ def kronVectors(toReturn,V1,V2):
 # Must be declared before call:   toReturn = PETSc.Mat()
 # type(M1) : dolfin.cpp.la.Matrix
 # type(M2) : numpy/scipy sparse matrix
+# seems not OK in parallel
 def kronMatrices(toReturn,M1,M2):
 	import scipy.sparse as ssp
         M1_petsc4py = as_backend_type(M1).mat()

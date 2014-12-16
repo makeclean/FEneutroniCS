@@ -197,7 +197,7 @@ if (BC=='fixed_flux'):
 	for bc in bcsFixedFlux:
 		bc.apply(uFixedFlux.vector())
 	d2v = V.dofmap().dofs()
-	fixedFluxVertices = d2v[uFixedFlux.vector() == 1.0]
+	fixedFluxVertices = d2v[uFixedFlux.vector().get_local() == 1.0]
         for ii in range(0,numSpherHarmonics):
 		list_indices_fixed_flux += ( fixedFluxVertices * numSpherHarmonics + ii ).tolist()
 
@@ -214,7 +214,7 @@ if (PnOrder>=3):
 	for bc in bcsRefl:
 		bc.apply(uRefl.vector())
 	d2v = V.dofmap().dofs()
-	reflected_vertices = d2v[uRefl.vector() == 1.0]
+	reflected_vertices = d2v[uRefl.vector().get_local() == 1.0]
         ii = 1
         for nn in range (2,PnOrder,2):
            for mm in range (0,nn+1):
@@ -253,6 +253,13 @@ if (nDim ==3):
 	matKEExz = PETSc.Mat()
 
 kronProducts.kronMatrices(matNZZ,N_mat,ZZ)
+
+print "---- on MPIrank ", MPIrank, ": N_mat.size(0)=",N_mat.size(0)
+print "---- on MPIrank ", MPIrank, ": N_mat.size(1)=",N_mat.size(1)
+print "---- on MPIrank ", MPIrank, ": N_mat.local_range(0)=",N_mat.local_range(0)
+print "---- on MPIrank ", MPIrank, ": N_mat.array().shape=",N_mat.array().shape
+print "---- on MPIrank ", MPIrank, ": matNZZ.getOwnershipRange() =",matNZZ.getOwnershipRange()
+
 kronProducts.kronMatrices(matKEEx,Kxx_mat,ExEx)
 kronProducts.kronMatrices(matKEEy,Kyy_mat,EyEy)
 kronProducts.kronMatrices(matKEExy,Kxy_mat,ExEy)
