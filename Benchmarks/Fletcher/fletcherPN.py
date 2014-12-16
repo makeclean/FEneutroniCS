@@ -1,21 +1,15 @@
 """
-Fletcher benchmark
-= square-in-a-square
-Source = 1./1.44 in bottom-left square, zero elsewhere.
-B.C.:
-Reflection (-du/dn =0) on x=0 and y=0.
-Vacuum or fixed flux on x=1. and y=1.
-"""
-import sys
-sys.path.append('../../')
-sys.path.append('../../')
-sys.path.append('../../')
-from dolfin import *
-import numpy as np
+Fletcher benchmark:
+- Reference: J.K. Fletcher, 'The solution of the time-independent multi-group neutron transport equation using spherical harmonics', Annals of Nuclear Energy, Vol. 4, pp. 401, 1977.
+- Geometry = square-in-a-square (4 and 1.2 cm, respectively)
+- Source = 1./1.44 in bottom-left square, zero elsewhere.
+- B.C.: Reflection on x=0 and y=0.  Vacuum (can be replaced by fixed flux here) at x=1. and y=1.
+- 3-D version also enabled here
 
-nx   = 120
-nx   = 10
-nx   = 40
+Author: S. Van Criekingen
+"""
+# ------------
+# To be fixed by the user:
 nx   = 4
 ny   = nx
 nz   = nx
@@ -23,9 +17,25 @@ degree = 1
 PnOrder = 3
 nDim = 2
 
-BC='vacuum'
+## Chose BC at x=1. and y=1. by un-commenting the following:
+## To apply vacuum BC:
+#BC='vacuum'
+## To apply fixed flux BC:
 BC='fixed_flux'
 fixedFluxValue = 0.0
+# ------------
+
+import sys
+sys.path.append('../../')
+from dolfin import *
+import numpy as np
+import kronProducts
+import petsc4py
+petsc4py.init(sys.argv)
+from petsc4py import PETSc
+
+MPIsize = MPI.size(mpi_comm_world())
+MPIrank = MPI.rank(mpi_comm_world())
 
 xmin = 0.
 xmax = 4.0
@@ -41,22 +51,27 @@ elif (nDim==3):
 	mesh = BoxMesh(xmin, ymin, zmin, xmax, ymax, zmax, nx, ny, nz)
 	numSpherHarmonics = int( 1 + (PnOrder-1)*(PnOrder+2)/2 )
 
-numVertices = mesh.num_vertices()
+numVertices_local = mesh.num_vertices()
 V = FunctionSpace(mesh, "Lagrange", degree)
 numSpatialDOFs = V.dim()
 numDOFs = numSpatialDOFs*numSpherHarmonics
 
-print "---- nDim = ", nDim
-print "---- nx = ", nx
-print "---- degree = ", degree
-print "---- PnOrder = ", PnOrder
-print "---- numVertices = ", numVertices
-print "---- numSpatialDOFs = ", numSpatialDOFs
-print "---- numSpherHarmonics = ", numSpherHarmonics
-print "---- numDOFs = ", numSpatialDOFs*numSpherHarmonics
-print "---- BC = ", BC
-if (BC=='fixed_flux'):
-	print "---- fixed flux value = ", fixedFluxValue
+if (MPIrank==0):
+      print "---- MPIsize = ", MPIsize
+      print "---- MPIrank = ", MPIrank
+      print "---- nDim = ", nDim
+      print "---- nx = ", nx
+      print "---- degree = ", degree
+      print "---- PnOrder = ", PnOrder
+      print "---- numSpatialDOFs = ", numSpatialDOFs
+      print "---- numSpherHarmonics = ", numSpherHarmonics
+      print "---- numDOFs = ", numSpatialDOFs*numSpherHarmonics
+      print "---- BC = ", BC
+      if (BC=='fixed_flux'):
+              print "---- fixed flux value = ", fixedFluxValue
+
+print "---- on MPIrank ", MPIrank, " numCells_local = ", mesh.num_cells()
+print "---- on MPIrank ", MPIrank, " numVertices_local = ", numVertices_local
 
 boundaries = FacetFunction("size_t", mesh)
 subdomains = MeshFunction('size_t', mesh, nDim)
@@ -79,16 +94,18 @@ elif (nDim==3):
 	subdomain1 = Omega1_3D()
 subdomain0.mark(subdomains, 0)
 subdomain1.mark(subdomains, 1)
-#plot(subdomains)
 
-import subdomainFunctionDefinition
-values = [0., .6944444444]  # values of f in the two subdomains
-f = subdomainFunctionDefinition.returnFunction(V0, subdomains, values)
-
+### Elementary matrices building
 # Spatial
 u  = TrialFunction(V)
 v  = TestFunction(V)
 ds = Measure("ds")[boundaries] # must come after subdomain definition
+
+import subdomainFunctionDefinition
+values = [0., .6944444444]  # values of f in the two subdomains
+f = subdomainFunctionDefinition.returnFunction(V0, subdomains, values)
+L  = f*v*dx
+b_vec = assemble(L)
 
 N_op = u*v*dx
 du_x = nabla_grad(u)[0]; dv_x = nabla_grad(v)[0];
@@ -101,7 +118,7 @@ if (nDim==3):
 	Kzz_op = inner(du_z, dv_z)*dx
 	Kxz_op = inner(du_x, dv_z)*dx
 	Kyz_op = inner(du_y, dv_z)*dx
-parameters["linear_algebra_backend"] = "uBLAS"
+
 N_mat = assemble(N_op)
 Kxx_mat = assemble(Kxx_op)
 Kxy_mat = assemble(Kxy_op)
@@ -137,7 +154,6 @@ while (iPnOrder <= PnOrder):
    tic()
    jPnOrder = 0
    while (jPnOrder <= iPnOrder):
-      #print "jP", jPnOrder
       Exij = returnMatEx(PnOrder,numSpherHarmonics,iPnOrder,jPnOrder);
       Eyij = returnMatEy(PnOrder,numSpherHarmonics,iPnOrder,jPnOrder);
       ExEx += Exij*np.transpose(Exij)
@@ -149,7 +165,7 @@ while (iPnOrder <= PnOrder):
          EyEz += Eyij*np.transpose(Ezij)
          ExEz += Exij*np.transpose(Ezij)
       jPnOrder += 1
-   print "Time in Angular P", iPnOrder, " =", toc()
+   print "---- on MPIrank ", MPIrank, ": time in Angular P", iPnOrder, " =", toc()
    iPnOrder += 2
 
 if (BC=='vacuum'):
@@ -169,13 +185,8 @@ sigma = Constant(0.5)
 sigma_r = sigma
 SigmaInv = 1./sigma
 
-#### RHS
-
-L  = f*v*dx
-b_mat = assemble(L)
-
-#### fixed flux
-
+#### BC preparation: establish the list of be treated later on
+# For fixed flux BC:
 if (BC=='fixed_flux'):
 	if (nDim ==2):
 		bcsFixedFlux = [DirichletBC(V, 1.0, boundaries, 2),DirichletBC(V, 1.0, boundaries, 4)]
@@ -190,9 +201,9 @@ if (BC=='fixed_flux'):
         for ii in range(0,numSpherHarmonics):
 		list_indices_fixed_flux += ( fixedFluxVertices * numSpherHarmonics + ii ).tolist()
 
-#### reflection BCs
-# --- 2D: Y00, Y20, Y21, Y22, Y40, Y41, Y42, Y43, Y44, Y60, Y61
-# To cancel: P3: +2; P5: +5, +7; P7: +10,+12,+14
+# For reflection BCs:
+#  Spherical harmonics to cancel in 2D: Y00, Y20, Y21, Y22, Y40, Y41, Y42, Y43, Y44, Y60, Y61
+#  -> to cancel: P3: +2; P5: +5, +7; P7: +10,+12,+14
 if (PnOrder>=3):
 	if (nDim ==2):
 		bcsRefl = [DirichletBC(V, 1.0, boundaries, 1),DirichletBC(V, 1.0, boundaries, 3)]
@@ -219,11 +230,19 @@ if (PnOrder>=3):
                  ii +=1
 
 
-#### System building and solution
+#### RHS building
 
-import petsc4py
-petsc4py.init(sys.argv)
-from petsc4py import PETSc
+tic()
+rhs_dolfin = PETScVector()
+kronProducts.kronVectors(rhs_dolfin,b_vec,P)
+print "---- on MPIrank ", MPIrank, ": rhs_dolfin.local_size()=",rhs_dolfin.local_size()
+print "---- on MPIrank ", MPIrank, ": rhs_dolfin.local_range()=",rhs_dolfin.local_range()
+print "Time in RHS building=", toc()
+rhs = as_backend_type(rhs_dolfin).vec() # this is a petsc4py object
+
+#### System building
+
+tic()
 matNZZ = PETSc.Mat()
 matKEEx = PETSc.Mat()
 matKEEy = PETSc.Mat()
@@ -232,25 +251,15 @@ if (nDim ==3):
 	matKEEz = PETSc.Mat()
 	matKEEyz = PETSc.Mat()
 	matKEExz = PETSc.Mat()
-import kronProducts
 
-rhs = PETSc.Vec()
-tic()
-kronProducts.kronVectors(rhs,b_mat,P)
-rhs.assemblyBegin(); rhs.assemblyEnd()
-print "Time in RHS building=", toc()
-
-tic()
-kronProducts.kronMatrices(matNZZ,N_mat.sparray(),ZZ)
-kronProducts.kronMatrices(matKEEx,Kxx_mat.sparray(),ExEx)
-kronProducts.kronMatrices(matKEEy,Kyy_mat.sparray(),EyEy)
-kronProducts.kronMatrices(matKEExy,Kxy_mat.sparray(),ExEy)
+kronProducts.kronMatrices(matNZZ,N_mat,ZZ)
+kronProducts.kronMatrices(matKEEx,Kxx_mat,ExEx)
+kronProducts.kronMatrices(matKEEy,Kyy_mat,EyEy)
+kronProducts.kronMatrices(matKEExy,Kxy_mat,ExEy)
 if (nDim ==3):
 	kronProducts.kronMatrices(matKEEz,Kzz_mat,EzEz)
 	kronProducts.kronMatrices(matKEExz,Kxz_mat,ExEz)
 	kronProducts.kronMatrices(matKEEyz,Kyz_mat,EyEz)
-print "Time in fenics detailed assembled krons=", toc()
-tic()
 Hodd = SigmaInv * (matKEEx + matKEEy + matKEExy + matKEExy.transpose())
 if (nDim ==3):
 	Hodd += SigmaInv * (matKEEz + matKEEyz + matKEEyz.transpose() + matKEExz + matKEExz.transpose())
@@ -266,8 +275,10 @@ if (BC=='vacuum'):
 		HvacuumBC6 = PETSc.Mat()
 		kronProducts.kronMatrices(HvacuumBC6,Ngamma_mat6,Lpz)
 		H += HvacuumBC6
-H.assemblyBegin(); H.assemblyEnd()
-print "Time in fenics detailed assembled H build=", toc()
+print "Time in system building = ", toc()
+
+
+#### Applying BC 
 tic()
 for i in range (0,len(list_indices_fixed_flux)):
 	itc = list_indices_fixed_flux[i]
@@ -283,7 +294,12 @@ if (PnOrder>=3):
 		H.zeroRowsColumns(itc,1)
 		rhs.setValue(itc,0)
 print "Time in applying reflection BC=", toc()
+
+
+#### System solution
 tic()
+rhs.assemblyBegin(); rhs.assemblyEnd()
+H.assemblyBegin(); H.assemblyEnd()
 ksp = PETSc.KSP().create()
 #ksp.setType('cg')
 ksp.setType('gmres')
@@ -307,11 +323,11 @@ print "Time in solving process:", toc()
 print "Iteration Number:", ksp.getIterationNumber()
 print "Residual Norm:", ksp.getResidualNorm()
 
-the_index = numSpherHarmonics*(numVertices-1)/2
-if (degree == 1):
-	#for i in range(0,(int) numSpherHarmonics):
-	for i in range(0,numSpherHarmonics):
-		print "---- x[numSpherHarmonics*(numVertices-1)/2 +i] = x[", the_index+i, "] = " ,x[the_index+i]
+#the_index = numSpherHarmonics*(numVertices_local-1)/2
+#if (degree == 1):
+#	#for i in range(0,(int) numSpherHarmonics):
+#	for i in range(0,numSpherHarmonics):
+#		print "---- x[numSpherHarmonics*(numVertices_local-1)/2 +i] = x[", the_index+i, "] = " ,x[the_index+i]
 scalarFlux = Function(V)
 scalarFlux.vector()[:] = (x.array[0:numDOFs:numSpherHarmonics]).flatten()
 if (nDim == 2):

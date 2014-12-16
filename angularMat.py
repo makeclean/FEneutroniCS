@@ -1,3 +1,9 @@
+'''
+Returns elementary angular matrices for the PN approximation
+
+Author: S. Van Criekingen
+'''
+
 import numpy as np
 from scipy.special import sph_harm
 from scipy.integrate import dblquad

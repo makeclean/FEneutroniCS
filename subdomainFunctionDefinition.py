@@ -1,3 +1,6 @@
+'''
+Required for handling different materials within domain (see FEniCS documentation)
+'''
 from dolfin import *
 import numpy as np
 

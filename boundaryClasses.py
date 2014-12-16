@@ -1,3 +1,8 @@
+'''
+Defines boundaries for 2D square or 3D cubic domain
+
+Author: S. Van Criekingen
+'''
 # Boundary Classes definition
 
 from dolfin import *
