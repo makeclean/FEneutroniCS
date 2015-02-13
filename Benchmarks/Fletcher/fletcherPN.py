@@ -22,7 +22,7 @@ nDim = 2
 #BC='vacuum'
 ## To apply fixed flux BC:
 BC='fixed_flux'
-fixedFluxValue = 0.0
+fixedFluxValue = 1.0
 # ------------
 
 import sys
@@ -185,21 +185,23 @@ sigma = Constant(0.5)
 sigma_r = sigma
 SigmaInv = 1./sigma
 
-#### BC preparation: establish the list of be treated later on
+#### BC preparation: establish the list of indices be treated later on
 # For fixed flux BC:
 if (BC=='fixed_flux'):
 	if (nDim ==2):
 		bcsFixedFlux = [DirichletBC(V, 1.0, boundaries, 2),DirichletBC(V, 1.0, boundaries, 4)]
 	elif (nDim ==3):
 		bcsFixedFlux = [DirichletBC(V, 1.0, boundaries, 2),DirichletBC(V, 1.0, boundaries, 4),DirichletBC(V, 1.0, boundaries, 6)]
-	list_indices_fixed_flux = list()
+	list_indices_fixed_flux1 = list()
+	list_indices_fixed_flux2 = list()
 	uFixedFlux = Function(V)
 	for bc in bcsFixedFlux:
 		bc.apply(uFixedFlux.vector())
 	d2v = V.dofmap().dofs()
 	fixedFluxVertices = d2v[uFixedFlux.vector().get_local() == 1.0]
-        for ii in range(0,numSpherHarmonics):
-		list_indices_fixed_flux += ( fixedFluxVertices * numSpherHarmonics + ii ).tolist()
+	list_indices_fixed_flux1 += (fixedFluxVertices * numSpherHarmonics).tolist()
+        for ii in range(1,numSpherHarmonics):
+		list_indices_fixed_flux2 += ( fixedFluxVertices * numSpherHarmonics + ii ).tolist()
 
 # For reflection BCs:
 #  Spherical harmonics to cancel in 2D: Y00, Y20, Y21, Y22, Y40, Y41, Y42, Y43, Y44, Y60, Y61
@@ -287,11 +289,16 @@ print "Time in system building = ", toc()
 
 #### Applying BC 
 tic()
-for i in range (0,len(list_indices_fixed_flux)):
-	itc = list_indices_fixed_flux[i]
-	#print "itc=",itc
-	H.zeroRowsColumns(itc,1)
+for i in range (0,len(list_indices_fixed_flux1)):
+	itc = list_indices_fixed_flux1[i]
+	#print "itc 1 =",itc
+	H.zeroRows(itc,1)
 	rhs.setValue(itc,fixedFluxValue)
+for i in range (0,len(list_indices_fixed_flux2)):
+	itc = list_indices_fixed_flux2[i]
+	#print "itc 2 =",itc
+	H.zeroRows(itc,1)
+	rhs.setValue(itc,0)
 print "Time in applying fixed flux BC=", toc()
 tic()
 if (PnOrder>=3):
