@@ -113,20 +113,26 @@ du_y = nabla_grad(u)[1]; dv_y = nabla_grad(v)[1];
 Kxx_op = inner(du_x, dv_x)*dx
 Kyy_op = inner(du_y, dv_y)*dx
 Kxy_op = inner(du_x, dv_y)*dx
+Kyx_op = inner(du_y, dv_x)*dx
 if (nDim==3):
 	du_z = nabla_grad(u)[2]; dv_z = nabla_grad(v)[2]
 	Kzz_op = inner(du_z, dv_z)*dx
 	Kxz_op = inner(du_x, dv_z)*dx
 	Kyz_op = inner(du_y, dv_z)*dx
+	Kzx_op = inner(du_z, dv_x)*dx
+	Kzy_op = inner(du_z, dv_y)*dx
 
 N_mat = assemble(N_op)
 Kxx_mat = assemble(Kxx_op)
 Kxy_mat = assemble(Kxy_op)
+Kyx_mat = assemble(Kyx_op)
 Kyy_mat = assemble(Kyy_op) # ! not symmetric but Kxy + Kxy.transpose is symmetric => H symmetric
 if (nDim==3):
 	Kzz_mat = assemble(Kzz_op)
 	Kxz_mat = assemble(Kxz_op)
 	Kyz_mat = assemble(Kyz_op)
+	Kzx_mat = assemble(Kzx_op)
+	Kzy_mat = assemble(Kzy_op)
 if (BC=='vacuum'):
 	Ngamma_op2 = u*v*ds(2)
 	Ngamma_op4 = u*v*ds(4)
@@ -249,12 +255,13 @@ matNZZ = PETSc.Mat()
 matKEEx = PETSc.Mat()
 matKEEy = PETSc.Mat()
 matKEExy = PETSc.Mat()
+matKEEyx = PETSc.Mat() # also built to avoid transpose later (requires communications in parallel)
 if (nDim ==3):
 	matKEEz = PETSc.Mat()
 	matKEEyz = PETSc.Mat()
 	matKEExz = PETSc.Mat()
 
-kronProducts.kronMatrices(matNZZ,N_mat,ZZ)
+kronProducts.kronMatrices(matNZZ,as_backend_type(N_mat).mat(),ZZ)
 
 print "---- on MPIrank ", MPIrank, ": N_mat.size(0)=",N_mat.size(0)
 print "---- on MPIrank ", MPIrank, ": N_mat.size(1)=",N_mat.size(1)
@@ -262,16 +269,20 @@ print "---- on MPIrank ", MPIrank, ": N_mat.local_range(0)=",N_mat.local_range(0
 print "---- on MPIrank ", MPIrank, ": N_mat.array().shape=",N_mat.array().shape
 print "---- on MPIrank ", MPIrank, ": matNZZ.getOwnershipRange() =",matNZZ.getOwnershipRange()
 
-kronProducts.kronMatrices(matKEEx,Kxx_mat,ExEx)
-kronProducts.kronMatrices(matKEEy,Kyy_mat,EyEy)
-kronProducts.kronMatrices(matKEExy,Kxy_mat,ExEy)
+kronProducts.kronMatrices(matKEEx,as_backend_type(Kxx_mat).mat(),ExEx)
+kronProducts.kronMatrices(matKEEy,as_backend_type(Kyy_mat).mat(),EyEy)
+kronProducts.kronMatrices(matKEExy,as_backend_type(Kxy_mat).mat(),ExEy)
+kronProducts.kronMatrices(matKEEyx,as_backend_type(Kyx_mat).mat(),ExEy.transpose())
 if (nDim ==3):
-	kronProducts.kronMatrices(matKEEz,Kzz_mat,EzEz)
-	kronProducts.kronMatrices(matKEExz,Kxz_mat,ExEz)
-	kronProducts.kronMatrices(matKEEyz,Kyz_mat,EyEz)
-Hodd = SigmaInv * (matKEEx + matKEEy + matKEExy + matKEExy.transpose())
+	kronProducts.kronMatrices(matKEEz,as_backend_type(Kzz_mat).mat(),EzEz)
+	kronProducts.kronMatrices(matKEExz,as_backend_type(Kxz_mat).mat(),ExEz)
+	kronProducts.kronMatrices(matKEEyz,as_backend_type(Kyz_mat).mat(),EyEz)
+	kronProducts.kronMatrices(matKEEzx,as_backend_type(Kzx_mat).mat(),ExEz.transpose())
+	kronProducts.kronMatrices(matKEEzy,as_backend_type(Kzy_mat).mat(),EyEz.transpose())
+
+Hodd = SigmaInv * (matKEEx + matKEEy + matKEExy + matKEEyx)
 if (nDim ==3):
-	Hodd += SigmaInv * (matKEEz + matKEEyz + matKEEyz.transpose() + matKEExz + matKEExz.transpose())
+	Hodd += SigmaInv * (matKEEz + matKEEyz + matKEEzy + matKEExz + matKEEzx)
 Heven = sigma_r * matNZZ
 H = Hodd + Heven
 if (BC=='vacuum'):
