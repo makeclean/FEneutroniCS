@@ -28,19 +28,22 @@ def kronVectors(toReturn,V1,V2):
 def kronMatrices(toReturn,M1,M2):
 	import scipy.sparse as ssp
         M1localNrows = M1.sizes[0][0]
-        M1localNcols = M1.sizes[0][1]
+        M1globalNcols = M1.sizes[0][1]
         M2size = M2.shape[0]
         localNrows = M1localNrows * M2size
-        localNcols = M1localNcols * M2size
-        #print "------ M1size=",M1size," M2size=",M2size," theSize=",theSize
+        globalNcols = M1globalNcols * M2size
+        #print "------ M1localNrows=",M1localNrows," M1globalNcols=",M1globalNcols
+        #print "------ localNrows=",localNrows," globalNcols=",globalNcols
         M1localIndptr, M1localIndices, M1localData = M1.getValuesCSR()
-        M1_ssp = ssp.csr_matrix((M1localData,M1localIndices,M1localIndptr),shape=(M1localNrows,M1localNcols))
+        M1_ssp = ssp.csr_matrix((M1localData,M1localIndices,M1localIndptr),shape=(M1localNrows,M1globalNcols))
 
         kronProduct_ssp = ssp.kron(M1_ssp,M2)
         csr = kronProduct_ssp.tocsr()
 
         toReturn.create(PETSc.COMM_WORLD)
-        toReturn.setSizes(((localNrows, PETSc.DETERMINE), (localNcols, PETSc.DETERMINE)), bsize=1)
+        #toReturn.setSizes(((localNrows, PETSc.DETERMINE), (globalNcols, PETSc.DETERMINE)), bsize=1)
+        #toReturn.setSizes(((localNrows, PETSc.DETERMINE), (PETSc.DECIDE, globalNcols)), bsize=1)
+        toReturn.setSizes(((localNrows, PETSc.DETERMINE), (localNrows, PETSc.DETERMINE)), bsize=1)
         toReturn.setPreallocationNNZ(M1localData.size) # crash faster if after setType !?
 	toReturn.setType('aij')
 	toReturn.setUp()

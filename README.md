@@ -16,7 +16,6 @@ A basic one-group fixed-source example is presented,
 based on the Fletcher benchmark [2] benchmark,
 for which an extension to 3-D is provided.
 Vacuum or fixed-flux boundary conditions can be applied.
-The program does not work in parallel for now because of the matrix kron product - a question has been asked to the FEniCS Q&A forum to solve this issue.
 No multi-group nor criticality calculation example is provided for now.
 
 References
