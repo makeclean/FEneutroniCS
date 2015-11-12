@@ -10,10 +10,10 @@ The PETSc (http://www.mcs.anl.gov/petsc/) back-end is used for solving the resul
 
 The finite elements used here are the default tetrahedrons/triangular ones implemented in FEniCS.
 The matrix building and boundary condition handling is performed as described in [1],
-even if the (non-conforming) finite elements considered in this reference are different than the (conforming) ones used here.
+even if the (non-conforming) finite elements considered in this reference are different from the (conforming) ones used here.
 
 A basic one-group fixed-source example is presented,
-based on the Fletcher benchmark [2] benchmark,
+based on the Fletcher benchmark [2],
 for which an extension to 3-D is provided.
 Vacuum or fixed-flux boundary conditions can be applied.
 No multi-group nor criticality calculation example is provided for now.

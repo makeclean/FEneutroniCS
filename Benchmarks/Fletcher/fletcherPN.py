@@ -47,7 +47,7 @@ zmin = 0.
 zmax = 4.0
 
 if (nDim==2):
-	mesh = RectangleMesh(xmin, ymin, xmax, ymax, nx, ny)  # nx, ny might need to be even given subdomain definition
+	mesh = RectangleMesh(Point(xmin, ymin), Point(xmax,ymax), nx, ny)  # nx, ny might need to be even given subdomain definition
 	numSpherHarmonics = int((PnOrder + 1)/2.)**2
 elif (nDim==3):
 	mesh = BoxMesh(xmin, ymin, zmin, xmax, ymax, zmax, nx, ny, nz)
