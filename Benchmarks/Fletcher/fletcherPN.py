@@ -14,8 +14,8 @@ nx   = 4
 ny   = nx
 nz   = nx
 degree = 1
-PnOrder = 3
-nDim = 2
+PnOrder = 1
+nDim = 3
 
 ## Chose BC at x=1. and y=1. by un-commenting the following:
 ## To apply vacuum BC:
@@ -50,7 +50,7 @@ if (nDim==2):
 	mesh = RectangleMesh(Point(xmin, ymin), Point(xmax,ymax), nx, ny)  # nx, ny might need to be even given subdomain definition
 	numSpherHarmonics = int((PnOrder + 1)/2.)**2
 elif (nDim==3):
-	mesh = BoxMesh(xmin, ymin, zmin, xmax, ymax, zmax, nx, ny, nz)
+	mesh = BoxMesh(Point(xmin, ymin, zmin), Point(xmax, ymax, zmax), nx, ny, nz)
 	numSpherHarmonics = int( 1 + (PnOrder-1)*(PnOrder+2)/2 )
 
 numVertices_local = mesh.num_vertices()
@@ -235,6 +235,8 @@ if (nDim ==3):
 	matKEEz = PETSc.Mat()
 	matKEEyz = PETSc.Mat()
 	matKEExz = PETSc.Mat()
+	matKEEzx = PETSc.Mat()
+	matKEEzy = PETSc.Mat()
 
 #### pre-applying fixed-flux BCs by zeroing corresponding lines
 if (BC=='fixed_flux'):
